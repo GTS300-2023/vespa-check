@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1513">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vespa-Check">
+<title>Vespa-Check</title>
+<style>
+  /* Layout: eine Spalte, Hinfahrt gross oben, Rückfahrt darunter. Farbe nur für die Bewertung 1 bis 5. */
+  :root {
+    --bg: #f2f5f3;
+    --surface: #ffffff;
+    --fg: #16201c;
+    --muted: #5a6761;
+    --line: #d8dfdb;
+    --accent: #1b5568;
+    --accent-fg: #ffffff;
+    --g1: #1c8a4a;
+    --g2: #5d9420;
+    --g3: #b87d00;
+    --g4: #cc5410;
+    --g5: #bf2a2a;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1513;
+      --surface: #182220;
+      --fg: #e7eeea;
+      --muted: #92a19a;
+      --line: #2a3733;
+      --accent: #8cc9dc;
+      --accent-fg: #0f1513;
+      --g1: #4fcb86;
+      --g2: #a0d24c;
+      --g3: #f0b62f;
+      --g4: #ff8c50;
+      --g5: #ff6d6d;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1513;
+    --surface: #182220;
+    --fg: #e7eeea;
+    --muted: #92a19a;
+    --line: #2a3733;
+    --accent: #8cc9dc;
+    --accent-fg: #0f1513;
+    --g1: #4fcb86;
+    --g2: #a0d24c;
+    --g3: #f0b62f;
+    --g4: #ff8c50;
+    --g5: #ff6d6d;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.45 ui-rounded, "SF Pro Rounded", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    padding-block: max(16px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  main { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .top h1 { margin: 0; font-size: 1.35rem; letter-spacing: -0.01em; }
+  .top p { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
+  button { font: inherit; color: inherit; }
+  .btn {
+    border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+    border-radius: 10px; padding: 8px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .btn:focus-visible, .chip:focus-visible, summary:focus-visible, input:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px;
+  }
+
+  .days { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+    padding: 8px 14px; cursor: pointer; min-height: 40px;
+  }
+  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+  .card {
+    --c: var(--g1);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    padding: 16px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .g1 { --c: var(--g1); } .g2 { --c: var(--g2); } .g3 { --c: var(--g3); }
+  .g4 { --c: var(--g4); } .g5 { --c: var(--g5); }
+
+  .ride-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .ride-head h2 { margin: 0; font-size: 1.05rem; }
+  .when { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .tag { font-size: 0.78rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+
+  .verdict { display: flex; align-items: center; gap: 16px; }
+  .grade {
+    flex: none; width: 64px; height: 64px; border-radius: 50%;
+    border: 6px solid var(--c); color: var(--c);
+    display: grid; place-items: center; font-size: 1.9rem; font-weight: 800; line-height: 1;
+  }
+  .primary .grade { width: 92px; height: 92px; border-width: 8px; font-size: 3rem; }
+  .vtext { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .vtext strong { font-size: 1.2rem; line-height: 1.2; }
+  .primary .vtext strong { font-size: 1.45rem; }
+  .scale { display: flex; gap: 3px; width: 100%; max-width: 200px; }
+  .scale i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+  .scale i.on { background: var(--c); }
+  .scale-l { display: flex; justify-content: space-between; max-width: 200px; font-size: 0.72rem; color: var(--muted); }
+
+  .reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .reasons li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+  .reasons li::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--rc, var(--muted)); transform: translateY(-1px); }
+  .reasons li.hard { --rc: var(--c); font-weight: 650; }
+  .reasons li.soft { --rc: var(--g3); }
+  .reasons li.ok { --rc: var(--g1); }
+  .reasons .pl { color: var(--muted); font-size: 0.82rem; font-weight: 400; }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 0; }
+  .facts div { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; min-width: 0; }
+  .facts dt { font-size: 0.74rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+  .facts dd { margin: 2px 0 0; font-weight: 700; font-size: 1.05rem; overflow-wrap: anywhere; }
+  .facts small { display: block; font-weight: 400; color: var(--muted); font-size: 0.78rem; }
+
+  details summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; padding: 4px 0; }
+  .tbl { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+
+  .settings { border: 1px solid var(--line); border-radius: 12px; padding: 4px 12px; background: var(--surface); }
+  .settings .row { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 0 12px; }
+  .settings label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+  .settings input { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+
+  .msg { border: 1px dashed var(--line); border-radius: 14px; padding: 16px; color: var(--muted); }
+  .msg strong { color: var(--fg); }
+  .warn { background: var(--surface); border: 1px solid var(--g3); border-radius: 12px; padding: 10px 12px; font-size: 0.9rem; }
+  footer { color: var(--muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card { transition: border-color 0.2s; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1>Vespa-Check</h1>
+      <p>Stieldorf → Bonn · ca. 15 km</p>
+    </div>
+    <button class="btn" id="refresh" type="button">Aktualisieren</button>
+  </div>
+
+  <div class="days" id="days" role="group" aria-label="Tag wählen"></div>
+  <div id="notice"></div>
+  <div id="cards" aria-live="polite"></div>
+
+  <details class="settings">
+    <summary>Abfahrtszeiten</summary>
+    <div class="row">
+      <label for="t-hin">Hinfahrt ab
+        <input type="time" id="t-hin" value="06:30">
+      </label>
+      <label for="t-rueck">Rückfahrt ab
+        <input type="time" id="t-rueck" value="16:30">
+      </label>
+    </div>
+  </details>
+
+  <footer id="foot"></footer>
+</main>
+
+<script>
+/*SCORING-START*/
+const PLACES = [
+  { id: 'stieldorf', name: 'Stieldorf', lat: 50.70, lon: 7.23 },
+  { id: 'bonn', name: 'Bonn', lat: 50.7374, lon: 7.0982 }
+];
+const HOURLY = ['temperature_2m', 'relative_humidity_2m', 'dew_point_2m', 'soil_temperature_0cm',
+  'precipitation', 'snowfall', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m'];
+const LABELS = { 1: 'Sehr gut geeignet', 2: 'Gut geeignet', 3: 'Mit Vorsicht', 4: 'Nicht empfohlen', 5: 'Dringend abgeraten' };
+
+const pad = n => String(n).padStart(2, '0');
+const fmt = (n, d = 1) => {
+  const f = Math.pow(10, d);
+  let r = Math.round(n * f) / f;
+  if (r === 0) r = 0;
+  return r.toLocaleString('de-DE', { maximumFractionDigits: d }).replace('-', '\u2212');
+};
+
+function parseResponse(json) {
+  const arr = Array.isArray(json) ? json : [json];
+  return PLACES.map((place, i) => {
+    const h = arr[i].hourly;
+    const index = {};
+    h.time.forEach((t, k) => { index[t] = k; });
+    return { place, h, index };
+  });
+}
+
+const gradeOf = p => (p < 1 ? 1 : p < 2.5 ? 2 : p < 4 ? 3 : p < 6 ? 4 : 5);
+
+/* Bewertung für einen Ort und ein Zeitfenster (Abfahrtsstunde + eine Stunde).
+   Straßentemperatur wird geschätzt als Mittel aus Lufttemperatur und Bodenoberfläche des Modells. */
+function assessPlace(pd, dateStr, depMin) {
+  const h0 = Math.floor(depMin / 60);
+  const i0 = pd.index[dateStr + 'T' + pad(h0) + ':00'];
+  if (i0 === undefined) return null;
+  const n = pd.h.time.length;
+  const ride = [i0, i0 + 1].filter(i => i < n);
+  const hist = [];
+  for (let k = Math.max(0, i0 - 12); k < i0; k++) hist.push(k);
+
+  const get = (name, idxs) => idxs
+    .map(i => (pd.h[name] ? pd.h[name][i] : null))
+    .filter(v => v !== null && v !== undefined);
+  const min = a => (a.length ? Math.min(...a) : null);
+  const max = a => (a.length ? Math.max(...a) : null);
+  const sum = a => a.reduce((s, v) => s + v, 0);
+  const has = (arr, list) => arr.some(c => list.indexOf(c) >= 0);
+
+  const tAir = get('temperature_2m', ride);
+  if (!tAir.length) return null;
+  const tMin = min(tAir), tMax = max(tAir);
+  const surf = get('soil_temperature_0cm', ride);
+  const surfMin = surf.length ? min(surf) : tMin;
+  const roadT = (tMin + surfMin) / 2;
+
+  const precipMax = max(get('precipitation', ride)) || 0;
+  const precipHist = sum(get('precipitation', hist));
+  const snowMax = max(get('snowfall', ride)) || 0;
+  const snowHist = sum(get('snowfall', hist));
+  const gustMax = max(get('wind_gusts_10m', ride)) || 0;
+  const windMax = max(get('wind_speed_10m', ride)) || 0;
+  const rhMax = max(get('relative_humidity_2m', ride)) || 0;
+  const spreads = ride.map(i => {
+    const t = pd.h.temperature_2m[i];
+    const d = pd.h.dew_point_2m ? pd.h.dew_point_2m[i] : null;
+    return (t == null || d == null) ? null : t - d;
+  }).filter(v => v !== null);
+  const spread = spreads.length ? min(spreads) : null;
+  const codes = get('weather_code', ride);
+  const codesHist = get('weather_code', hist.slice(-3));
+
+  const R = [];
+  let pts = 0, hard = 1, road = 'trocken', roadRank = 0;
+  const setRoad = (rank, label) => { if (rank > roadRank) { roadRank = rank; road = label; } };
+  const add = (kind, sev, text) => R.push({ kind, sev, text, place: pd.place.name });
+  const bump = (kind, g, text) => { hard = Math.max(hard, g); add(kind, 10 + g, text); };
+
+  const wetNow = precipMax >= 0.1 || has(codes, [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82]);
+  const wetHist = precipHist >= 0.2;
+  const cold = roadT;
+
+  // Harte Regeln: setzen eine Mindestnote, egal wie der Rest aussieht
+  if (has(codes, [56, 57, 66, 67]) || has(codesHist, [56, 57, 66, 67])) {
+    bump('ice', 5, 'Gefrierender Regen, akute Glatteisgefahr');
+    setRoad(6, 'Glatteis');
+  }
+  if (snowMax >= 0.1 || has(codes, [71, 73, 75, 77, 85, 86])) {
+    if (tMin <= 2) { bump('snow', 5, 'Schneefall'); setRoad(5, 'Schnee'); }
+    else { bump('snow', 4, 'Schneeregen möglich'); setRoad(4, 'Matsch'); }
+  } else if (snowHist >= 0.5 && roadT <= 1) {
+    bump('snow', 4, 'Schnee auf der Fahrbahn möglich');
+    setRoad(4, 'Schnee');
+  }
+  if (cold <= 0.5) {
+    if (wetNow) {
+      bump('ice', 5, 'Nasse Fahrbahn bei ' + fmt(cold) + ' °C, Glatteis');
+      setRoad(6, 'Glatteis');
+    } else if (wetHist) {
+      bump('ice', 4, 'Fahrbahn war nass und kann gefroren sein');
+      setRoad(5, 'Glatteis möglich');
+    } else if ((spread !== null && spread <= 2) || rhMax >= 90) {
+      bump('ice', 4, 'Reifglätte wahrscheinlich');
+      setRoad(4, 'Reifglätte');
+    } else {
+      bump('ice', 3, 'Frost, Restfeuchte und Brücken möglich');
+      setRoad(3, 'Frost');
+    }
+  } else if (tMin <= 3 && roadT <= 1.5 && (wetHist || rhMax >= 85)) {
+    pts += 1;
+    add('ice', 1.2, 'Brückenfrost möglich');
+    setRoad(2, 'Brückenfrost möglich');
+  }
+  if (cold > 0.5 && wetNow && roadT <= 4) {
+    pts += 1;
+    add('road', 1.1, 'Kalt und nass, weniger Haftung');
+  }
+  if (wetNow) setRoad(1, 'nass');
+  else if (wetHist) { setRoad(1, 'feucht'); pts += 0.3; }
+
+  if (has(codes, [95, 96, 99])) bump('storm', 4, 'Gewitter');
+  if (has(codes, [45, 48])) {
+    pts += 1.5;
+    add('fog', 1.6, 'Nebel, Sicht und Fahrbahn feucht');
+    if (has(codes, [48]) && tMin <= 0) bump('fog', 4, 'Reifnebel bei Frost');
+  }
+
+  // Strafpunkte
+  const pT = tMin >= 10 ? 0 : tMin >= 5 ? 0.5 : tMin >= 2 ? 1 : tMin >= 0 ? 1.5 : tMin >= -3 ? 2.5 : 3.5;
+  pts += pT;
+  if (pT >= 1) add('temp', pT, 'Kalt, ' + fmt(tMin) + ' °C');
+
+  const pR = precipMax < 0.1 ? 0 : precipMax < 0.3 ? 0.5 : precipMax < 1 ? 1.5 : precipMax < 2.5 ? 2.5 : precipMax < 5 ? 4 : 5;
+  pts += pR;
+  if (pR > 0) add('rain', pR, (precipMax < 0.3 ? 'Nieselregen, ' : 'Regen, ') + fmt(precipMax) + ' mm/h');
+  if (precipMax >= 5) bump('rain', 4, 'Starkregen, ' + fmt(precipMax) + ' mm/h');
+
+  const pW = gustMax < 35 ? 0 : gustMax < 45 ? 0.5 : gustMax < 55 ? 1.5 : gustMax < 65 ? 2.5 : 3.5;
+  pts += pW;
+  if (pW >= 1) add('wind', pW, 'Böen bis ' + fmt(gustMax, 0) + ' km/h');
+  if (gustMax >= 70) bump('wind', 5, 'Sturmböen bis ' + fmt(gustMax, 0) + ' km/h');
+  else if (gustMax >= 60) bump('wind', 4, 'Starke Böen bis ' + fmt(gustMax, 0) + ' km/h');
+
+  const grade = Math.max(gradeOf(pts), hard);
+  return {
+    place: pd.place.name, pts, grade, reasons: R, road, roadRank,
+    facts: { tMin, tMax, roadT, precipMax, gustMax, windMax, precipHist }
+  };
+}
+
+function assess(data, dateStr, depMin) {
+  const parts = data.map(pd => assessPlace(pd, dateStr, depMin)).filter(Boolean);
+  if (!parts.length) return null;
+  const grade = Math.max(...parts.map(p => p.grade));
+  const byKind = {};
+  parts.forEach(p => p.reasons.forEach(r => {
+    const c = byKind[r.kind];
+    if (!c || r.sev > c.sev) byKind[r.kind] = r;
+  }));
+  const reasons = Object.keys(byKind).map(k => byKind[k]).sort((a, b) => b.sev - a.sev);
+  const worst = parts.reduce((a, b) => (b.roadRank > a.roadRank ? b : a));
+  return {
+    grade, label: LABELS[grade], reasons, parts, road: worst.road,
+    tMin: Math.min(...parts.map(p => p.facts.tMin)),
+    roadT: Math.min(...parts.map(p => p.facts.roadT)),
+    precipMax: Math.max(...parts.map(p => p.facts.precipMax)),
+    gustMax: Math.max(...parts.map(p => p.facts.gustMax))
+  };
+}
+/*SCORING-END*/
+
+/* ---------- Oberfläche ---------- */
+const $ = s => document.querySelector(s);
+const state = { data: null, fetchedAt: null, offline: false, error: false, days: [], day: 0, hin: '06:30', rueck: '16:30' };
+
+const toMin = s => { const [h, m] = s.split(':').map(Number); return h * 60 + (m || 0); };
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const dayLabel = (dateStr, i) => {
+  if (i === 0) return 'Heute';
+  if (i === 1) return 'Morgen';
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric' });
+};
+const dayLong = dateStr => new Date(dateStr + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric' });
+
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem('vespa-prefs') || '{}');
+    if (/^\d\d:\d\d$/.test(p.hin || '')) state.hin = p.hin;
+    if (/^\d\d:\d\d$/.test(p.rueck || '')) state.rueck = p.rueck;
+  } catch (e) { /* ohne Speicher weiter */ }
+  $('#t-hin').value = state.hin;
+  $('#t-rueck').value = state.rueck;
+}
+function savePrefs() {
+  try { localStorage.setItem('vespa-prefs', JSON.stringify({ hin: state.hin, rueck: state.rueck })); } catch (e) { /* egal */ }
+}
+
+function buildDays() {
+  const todayKey = ymd(new Date());
+  const keys = [];
+  if (state.data) {
+    state.data[0].h.time.forEach(t => {
+      const d = t.slice(0, 10);
+      if (d >= todayKey && keys.indexOf(d) < 0) keys.push(d);
+    });
+  }
+  state.days = keys.slice(0, 3);
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const rueckEnd = toMin(state.rueck) + 90;
+  state.day = (nowMin >= rueckEnd && state.days.length > 1) ? 1 : 0;
+}
+
+function cardHTML(title, dateStr, dep, primary) {
+  const a = assess(state.data, dateStr, toMin(dep));
+  const head = '<header class="ride-head"><h2>' + title + '</h2><p class="when">ab ' + dep + ' · ' + dayLong(dateStr) + '</p></header>';
+  if (!a) {
+    return '<section class="card ' + (primary ? 'primary' : '') + '">' + head +
+      '<p class="msg">Für diese Zeit liegen keine Vorhersagedaten vor.</p></section>';
+  }
+  const now = new Date();
+  const isPast = dateStr === ymd(now) && now.getHours() * 60 + now.getMinutes() > toMin(dep) + 75;
+  const tag = isPast ? '<span class="tag">schon vorbei</span>' : '';
+  const scale = '<div class="scale" aria-hidden="true">' +
+    [1, 2, 3, 4, 5].map(i => '<i class="' + (i <= a.grade ? 'on' : '') + '"></i>').join('') + '</div>' +
+    '<div class="scale-l" aria-hidden="true"><span>gut</span><span>abraten</span></div>';
+
+  let reasons = a.reasons.slice(0, 4).map(r =>
+    '<li class="' + (r.sev >= 10 ? 'hard' : 'soft') + '">' + r.text + ' <span class="pl">· ' + r.place + '</span></li>').join('');
+  if (!reasons) reasons = '<li class="ok">Keine Auffälligkeiten auf der Strecke</li>';
+
+  const facts =
+    '<dl class="facts">' +
+    '<div><dt>Luft</dt><dd>' + fmt(a.tMin) + ' °C</dd></div>' +
+    '<div><dt>Straße</dt><dd>' + a.road + '<small>ca. ' + fmt(a.roadT) + ' °C</small></dd></div>' +
+    '<div><dt>Regen</dt><dd>' + fmt(a.precipMax) + ' mm/h</dd></div>' +
+    '<div><dt>Böen</dt><dd>' + fmt(a.gustMax, 0) + ' km/h</dd></div>' +
+    '</dl>';
+
+  const rows = a.parts.map(p =>
+    '<tr><td>' + p.place + '</td><td>' + fmt(p.facts.tMin) + ' °C</td><td>' + fmt(p.facts.roadT) + ' °C</td><td>' +
+    fmt(p.facts.precipMax) + ' mm/h</td><td>' + fmt(p.facts.gustMax, 0) + ' km/h</td><td>' + p.grade + '</td></tr>').join('');
+  const detail = '<details><summary>Werte je Ort</summary><div class="tbl"><table>' +
+    '<tr><th>Ort</th><th>Luft</th><th>Straße</th><th>Regen</th><th>Böen</th><th>Note</th></tr>' + rows +
+    '</table></div></details>';
+
+  return '<section class="card g' + a.grade + ' ' + (primary ? 'primary' : '') + '">' + head +
+    '<div class="verdict"><div class="grade" role="img" aria-label="Bewertung ' + a.grade + ' von 5">' + a.grade + '</div>' +
+    '<div class="vtext"><strong>' + a.label + '</strong>' + scale + '</div></div>' +
+    (tag ? '<div>' + tag + '</div>' : '') +
+    '<ul class="reasons">' + reasons + '</ul>' + facts + detail + '</section>';
+}
+
+function render() {
+  const days = $('#days'), cards = $('#cards'), notice = $('#notice'), foot = $('#foot');
+  if (!state.data) {
+    days.innerHTML = '';
+    notice.innerHTML = '';
+    cards.innerHTML = state.error
+      ? '<div class="msg"><strong>Wetterdaten nicht erreichbar.</strong><br>Prüfe die Internetverbindung und tippe auf „Aktualisieren“.</div>'
+      : '<div class="msg">Lade Wetterdaten …</div>';
+    foot.innerHTML = '';
+    return;
+  }
+  days.innerHTML = state.days.map((d, i) =>
+    '<button type="button" class="chip" data-i="' + i + '" aria-pressed="' + (i === state.day) + '">' + dayLabel(d, i) + '</button>').join('');
+  notice.innerHTML = state.offline
+    ? '<div class="warn">Keine Verbindung. Angezeigt werden gespeicherte Daten von ' +
+      new Date(state.fetchedAt).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) + '. Vor der Fahrt aktualisieren.</div>'
+    : '';
+  const d = state.days[state.day];
+  cards.innerHTML = '<div style="display:flex;flex-direction:column;gap:16px">' +
+    cardHTML('Hinfahrt', d, state.hin, true) + cardHTML('Rückfahrt', d, state.rueck, false) + '</div>';
+  foot.innerHTML =
+    '<span>Stand ' + new Date(state.fetchedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) +
+    ' · Wetterdaten von Open-Meteo (Modelle des Deutschen Wetterdienstes)</span>' +
+    '<span>Die Straßentemperatur und der Straßenzustand werden aus den Wetterdaten geschätzt. Die Bewertung ist eine Entscheidungshilfe, kein Ersatz für den Blick aus dem Fenster.</span>';
+}
+
+function readCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem('vespa-cache') || 'null');
+    if (c && Date.now() - c.t < 12 * 3600 * 1000) return c;
+  } catch (e) { /* kein Cache */ }
+  return null;
+}
+
+async function load() {
+  state.error = false;
+  if (!state.data) render();
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + PLACES.map(p => p.lat).join(',') +
+    '&longitude=' + PLACES.map(p => p.lon).join(',') +
+    '&hourly=' + HOURLY.join(',') +
+    '&timezone=Europe%2FBerlin&past_days=1&forecast_days=3&wind_speed_unit=kmh';
+  const ctl = new AbortController();
+  const to = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const res = await fetch(url, { signal: ctl.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    state.data = parseResponse(json);
+    state.fetchedAt = Date.now();
+    state.offline = false;
+    try { localStorage.setItem('vespa-cache', JSON.stringify({ t: state.fetchedAt, json })); } catch (e) { /* egal */ }
+  } catch (e) {
+    const c = readCache();
+    if (c) { state.data = parseResponse(c.json); state.fetchedAt = c.t; state.offline = true; }
+    else { state.data = null; state.error = true; }
+  } finally {
+    clearTimeout(to);
+  }
+  buildDays();
+  render();
+}
+
+$('#refresh').addEventListener('click', load);
+$('#days').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  state.day = Number(b.dataset.i);
+  render();
+});
+$('#t-hin').addEventListener('change', e => { if (e.target.value) { state.hin = e.target.value; savePrefs(); render(); } });
+$('#t-rueck').addEventListener('change', e => { if (e.target.value) { state.rueck = e.target.value; savePrefs(); render(); } });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.fetchedAt && Date.now() - state.fetchedAt > 30 * 60 * 1000) load();
+});
+
+loadPrefs();
+load();
+</script>
+</body>
+</html>
